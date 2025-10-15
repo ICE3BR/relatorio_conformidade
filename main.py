@@ -1,5 +1,7 @@
 import pandas as pd
 from docx import Document
+from docx.shared import Pt
+from docx.oxml.ns import qn
 from datetime import datetime
 import os
 import re
@@ -8,13 +10,13 @@ import re
 def preencher_relatorio():
     # Definir caminhos dos arquivos
     diretorio_atual = os.path.dirname(os.path.abspath(__file__))
-    arquivo_excel = os.path.join(diretorio_atual, 'Conformidade - Legal OpsTESTE.xlsx')
+    arquivo_excel = os.path.join(diretorio_atual, 'Pasta1 teste.xlsx')
     arquivo_word = os.path.join(diretorio_atual, 'MODELO RELATORIO.docx')
     
     # Verificar se os arquivos existem
     if not os.path.exists(arquivo_excel):
         print(f"ERRO: Arquivo Excel não encontrado: {arquivo_excel}")
-        print("Certifique-se de que o arquivo 'Conformidade - Legal OpsTESTE.xlsx' está na mesma pasta do script.")
+        print("Certifique-se de que o arquivo 'Conformidade - xlsx' está na mesma pasta do script.")
         return
     
     if not os.path.exists(arquivo_word):
@@ -187,6 +189,12 @@ def preencher_relatorio():
 
         return texto
 
+    def aplicar_fonte_calibri_light(run):
+        """Aplica fonte Calibri Light 10.5 ao run"""
+        run.font.name = 'Calibri Light'
+        run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Calibri Light')
+        run.font.size = Pt(10.5)
+
     # Para cada processo na planilha
     for index, row in df.iterrows():
         numero_processo = str(row['NUMERO_PROCESSO']) if 'NUMERO_PROCESSO' in row else f'_{index+1:03d}'
@@ -216,34 +224,41 @@ def preencher_relatorio():
                 novo_texto = aplicar_marcacoes(texto_substituido, row)
 
                 if novo_texto != texto_original:
-                    # Limpa os runs existentes e insere o novo texto
+                    # Limpa os runs existentes e insere o novo texto com formatação
                     for r in paragraph.runs:
                         r.text = ''
-                    paragraph.add_run(novo_texto)
+                    new_run = paragraph.add_run(novo_texto)
+                    aplicar_fonte_calibri_light(new_run)
             
             # Substituir nas tabelas
             for table in doc.tables:
                 for row_table in table.rows:
                     for cell in row_table.cells:
-                        texto_original = cell.text
-                        texto_substituido = texto_original
-                        
-                        # Substituições diretas {CHAVE}
-                        for coluna, placeholder in mapeamento.items():
-                            chave = f'{{{placeholder}}}'
-                            if chave in texto_substituido and coluna in row:
-                                valor = row[coluna]
-                                if 'DATA' in coluna:
-                                    valor = formatar_data(valor)
-                                else:
-                                    valor = '' if pd.isna(valor) or valor in ('', 'None', None) else str(valor)
-                                texto_substituido = texto_substituido.replace(chave, valor)
+                        # Processar cada parágrafo dentro da célula
+                        for paragraph in cell.paragraphs:
+                            texto_original = paragraph.text
+                            texto_substituido = texto_original
+                            
+                            # Substituições diretas {CHAVE}
+                            for coluna, placeholder in mapeamento.items():
+                                chave = f'{{{placeholder}}}'
+                                if chave in texto_substituido and coluna in row:
+                                    valor = row[coluna]
+                                    if 'DATA' in coluna:
+                                        valor = formatar_data(valor)
+                                    else:
+                                        valor = '' if pd.isna(valor) or valor in ('', 'None', None) else str(valor)
+                                    texto_substituido = texto_substituido.replace(chave, valor)
 
-                        # Marcações especiais -> coloca X dentro dos parênteses quando bater
-                        texto_substituido = aplicar_marcacoes(texto_substituido, row)
-                        
-                        if texto_substituido != texto_original:
-                            cell.text = texto_substituido
+                            # Marcações especiais -> coloca X dentro dos parênteses quando bater
+                            texto_substituido = aplicar_marcacoes(texto_substituido, row)
+                            
+                            if texto_substituido != texto_original:
+                                # Limpa os runs existentes e insere o novo texto com formatação
+                                for r in paragraph.runs:
+                                    r.text = ''
+                                new_run = paragraph.add_run(texto_substituido)
+                                aplicar_fonte_calibri_light(new_run)
             
             # Salvar o documento preenchido
             nome_arquivo_saida = f'RELATORIO_{limpar_nome_arquivo(numero_processo)}.docx'
