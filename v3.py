@@ -209,17 +209,17 @@ def preencher_relatorio(excel_path: str, modelo_preca_path: str, modelo_rpv_path
                 datas[col] = {'valor': _fmt_dt(cursor), 'prevista': True}
         return datas
 
+    
     def determinar_modelos(row):
-        data_rpv = _parse_data(row.get('DATA_RPV'))
-        data_preca = _parse_data(row.get('DATA_PRECA'))
-        modelos = []
-        if data_rpv is not None:
-            modelos.append(('RPV', modelo_rpv_path, EVENTOS_SEQUENCIA_RPV))
-        if data_preca is not None:
-            modelos.append(('PRECA', modelo_preca_path, EVENTOS_SEQUENCIA_PRECA))
-        if not modelos:
-            modelos.append(('PRECA', modelo_preca_path, EVENTOS_SEQUENCIA_PRECA))
-        return modelos
+        """
+        Sempre gera os dois modelos (PRECA e RPV),
+        independentemente de haver DATA_PRECA ou DATA_RPV na planilha.
+        """
+        return [
+            ('PRECA', modelo_preca_path, EVENTOS_SEQUENCIA_PRECA),
+            ('RPV',   modelo_rpv_path,   EVENTOS_SEQUENCIA_RPV),
+        ]
+
 
     def preencher_documento(doc, row, datas_resolvidas):
         # Parágrafos
